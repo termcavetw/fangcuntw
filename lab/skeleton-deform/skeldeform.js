@@ -14,7 +14,7 @@
    ★ 撇捺之所以是撇捺，就是因為它們是斜的：斜筆幾何化只把 25°–65° 的斜筆吸到
      45°，不吸成橫或豎（禾會變未、火會變兩豎）。只有很陡的撇照 skvsnap 拉直。
    ========================================================================== */
-const SKD_PARAMS=["skspread","skext","skocto","skvsnap","skdotv","skeven"];
+const SKD_PARAMS=["skspread","skext","skocto","skvsnap","skdotv","skeven","hgrid"];
 const SKD_TOL=14, SKD_NEAR=30, SKD_EG_OVERLAP=0.8, SKD_EG_W=2.0;
 const SKD_CACHE=new Map();
 function skdActive(f){ for(const k of SKD_PARAMS) if(f&&(+f[k]||0)!==0) return true; return false; }
@@ -200,8 +200,12 @@ function skdSolve(S,prm,alpha){
     }else if(e.c==="V"){
       /* 豎畫內收（conv）在 Python 版有，實測太弱，app 不開放 */
     }else{
+      /* 撇捺開合只張開「主要」撇捺（人、大、木）：依整筆長度漸入，
+         150 以下完全不動、300 以上全量。點、巛的〈、糸裡的短撇被一起轉，經會變怪。 */
+      const sp=S.strokes[e.si].p;let L=0;for(let i=1;i<sp.length;i++)L+=Math.hypot(sp[i][0]-sp[i-1][0],sp[i][1]-sp[i-1][1]);
+      const kL=Math.max(0,Math.min(1,(L-150)/150));
       const d=v[1]<0?v:[-v[0],-v[1]];
-      t=skdRot(t,d[0]<0?-spread:spread);
+      t=skdRot(t,(d[0]<0?-spread:spread)*kL);
     }
     const al=alpha[e.si];
     t=[v[0]+(t[0]-v[0])*al,v[1]+(t[1]-v[1])*al];
@@ -329,6 +333,33 @@ function skelDeform(strokes,prm,clear,report,sampler){
     }
     lam=lo;Q=Qlo;
   }
+  /* 橫線對齊（hgrid）在骨架層做：橫畫吸到 EM/12 的格線時，共用接點的筆端、
+     T 字接在橫畫上的筆端一起移，豎畫跟著伸縮 —— 舊版只平移橫畫本身，
+     豎畫沒跟上，口的底橫被吸走後兩側多出兩隻腳、王的頂橫和豎脫開（實機：招牌黑的鐵）。 */
+  const hg=Math.max(0,Math.min(1,+prm.hgrid||0));
+  if(hg>0){
+    const step=1000/12, hs=[];
+    strokes.forEach((st,si)=>{ if(st.t!=="heng"||st.p.length<2) return;
+      const ks=st.p.map((_,pi)=>S.idx.get(si+","+pi)), ys=ks.map(k=>Q[k][1]), xs=ks.map(k=>Q[k][0]);
+      const mid=ys.reduce((a,b)=>a+b,0)/ys.length;
+      hs.push({si,ks,mid,row:Math.round(mid/step),lo:Math.min(...xs),hi:Math.max(...xs)}); });
+    /* 兩條左右重疊的橫畫吸到同一條格線 → 疊成一條、少一畫。離格線遠的那條不吸。 */
+    for(const a of hs) for(const b of hs){ if(a===b||a.row!==b.row||a.skip||b.skip) continue;
+      if(Math.min(a.hi,b.hi)-Math.max(a.lo,b.lo)>0){
+        const da=Math.abs(a.row*step-a.mid), db=Math.abs(b.row*step-b.mid);
+        (da>db?a:b).skip=true; } }
+    const dyV=new Map(), add=(v,d)=>{const o=dyV.get(v)||[0,0];o[0]+=d;o[1]++;dyV.set(v,o);};
+    for(const h of hs){ if(h.skip) continue; const d=h.row*step-h.mid; for(const k of h.ks) add(S.var[k],d); }
+    const dy=v=>{const o=dyV.get(v);return o?o[0]/o[1]:0;};
+    const tj=new Map();
+    for(const [vk,va,vb,u] of S.tjoints) if(!dyV.has(vk)&&(dyV.has(va)||dyV.has(vb))) tj.set(vk,(1-u)*dy(va)+u*dy(vb));
+    const shift=t=>Q.map((q,k)=>{const v=S.var[k];const d=dyV.has(v)?dy(v):(tj.get(v)||0);return [q[0],q[1]+d*t];});
+    const base=skdViolations(S,Q,clear).length;
+    let t=hg,Qh=shift(t);
+    for(let r=0;r<3&&skdViolations(S,Qh,clear).length>base;r++){t*=.5;Qh=shift(t);}
+    if(skdViolations(S,Qh,clear).length<=base) Q=Qh;
+    if(report) report.hgrid=t;
+  }
   if(report){report.lam=lam;report.softened=alpha.filter(a=>a<1).length;report.kept=S.straight.filter(x=>!x).length;}
   const out=strokes.map((st,si)=>st.p.map((_,pi)=>Q[S.idx.get(si+","+pi)]));
   out.straight=S.straight.slice();
@@ -354,6 +385,7 @@ function skelDeformApply(raw,f,id,variant){
   const octo=Math.max(0,Math.min(1,+f.skocto||0));
   return raw.map((s,i)=>{
     const o={...s,p:P[i].map(q=>[q[0],q[1]])};
+    if((+f.hgrid||0)>0) o._hg=1;               /* 橫線對齊已在骨架層做過，筆畫層不要再平移一次 */
     if(octo>0&&(!P.straight||P.straight[i])){ o.bend=(s.bend||0)*(1-octo); if(octo>=.5){o.cv=null;o.qc=null;} }
     return o;
   });
