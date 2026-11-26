@@ -128,8 +128,8 @@ visual guard: reject cleanup that changes the raster beyond threshold
 SVG path / OTF
 ```
 
-Generator: `[FILL: GitHub URL]`  
-Interactive app: `[FILL: app URL]`
+Generator: https://github.com/termcavetw/fangcuntw  
+Interactive app: https://fangcun.termcavetw.com
 
 ### Sampling strategy
 
@@ -236,6 +236,6 @@ Source: https://glyphwiki.org/wiki/GlyphWiki:データ・記事のライセン�
 
 ## Contact / feedback
 
-`[FILL: GitHub Issues / contact]`
+GitHub Issues：https://github.com/termcavetw/fangcuntw/issues ・ Threads：[@termcavetw](https://www.threads.net/@termcavetw)
 
 If you find a systematic defect in generated outlines, please open an issue. One advantage of a parametric generator is that a renderer-level fix can improve many glyphs at once, and the dataset can then be regenerated.
