@@ -3196,7 +3196,9 @@ function baseWidthAt(st,t,tan,f){
     case "zhe":{const s=Math.abs(tan[1])/Math.max(1e-6,len(tan));
       return (hw+(sw-hw)*s)*k;}
     /* tp = 出鋒軸：把「偏離等寬的量」整個縮放。tp=0 等寬，tp=1 是原本的行為 */
-    case "pie": return sw*dg(f)*k*tp(f,Math.max(isK?0.15:0.09,1-(isK?0.82:0.90)*Math.pow(t,isK?1.18:1.30)));
+    /* v258：撇折的撇不收到尖（轉角要接下一筆）—— 收細只到筆長四成的程度為止 */
+    case "pie": {const tt=st._fold?Math.min(t,0.4):t;
+      return sw*dg(f)*k*tp(f,Math.max(isK?0.15:0.09,1-(isK?0.82:0.90)*Math.pow(tt,isK?1.18:1.30)));}
     case "na":  return sw*dg(f)*k*(isK?1.00:1.06)*tp(f,Math.max(isK?0.19:0.13,Math.pow(t,isK?0.88:0.80))*(1+f.finish*(isK?0.18:0.30)*smooth(0.72,1,t)));
     case "dian":return sw*dg(f)*k*tp(f,(isK?0.44:0.34)+(isK?0.58:0.72)*Math.pow(t,isK?0.78:0.70));
     case "ti":  return sw*dg(f)*k*(isK?1.03:1.12)*tp(f,Math.max(isK?0.16:0.10,1-Math.pow(t,isK?1.03:1.15)));
@@ -6888,7 +6890,7 @@ function latFit(strokes,f){
     /* ★ 探針必須走**跟正式輸出一模一樣**的路。第一版少走了 protectWhite 與
        trimTerminalCrossingsSafe 兩段，收斂後每邊固定差 18 單位 ——
        量錯地方就會收斂到錯的地方。 */
-    const mk2=markCorners(trimTerminalCrossingsSafe(protectWhite(probe,f),f),f);
+    const mk2=markCorners(trimTerminalCrossingsSafe(joinPieFolds(protectWhite(probe,f)),f),f);
     for(const st of mk2){
       if(!st.lat||!st.p||st.p.length<2) continue;
       try{ eat(strokeContours(st,f,st.ws,undefined)); }catch(err){}
@@ -7094,6 +7096,40 @@ function jointFill(strokes,f){
    把那個端點裁回真實交點。hook / bend 整筆直接排除，避免再次破壞 v176 已修好的鉤根。
    這是 topology trim，不是 same-stroke corner join。
    ============================================================================ */
+/* ==========================================================================
+   v258 — 撇折／撇點接成一筆
+   正規字型裡「糸的撇＋提」「巛、女的撇＋點」「ㄙ的撇＋提」都是一筆寫到底，
+   轉角是連著的。KAGE 把它拆成兩筆：撇的尾巴照撇的筆法收成尖、下一筆從旁邊
+   另起，畫出來就是兩截沒黏在一起（實機：經、女、巛、公）。
+   判準只看骨架幾何（撇的尾端與下一筆的頭相距 ≤42，且方向急轉 >60°），
+   與字重無關 —— 可變字型各主體的決定一致。
+   動作：下一筆的頭吸到撇的尾端；兩端都標成 conn（交給 markCorners 做轉角斜接
+   與補墨）；撇加上 _fold，筆寬不再一路收到尖。
+   ========================================================================== */
+function joinPieFolds(strokes){
+  const U=v=>{const l=Math.hypot(v[0],v[1])||1;return [v[0]/l,v[1]/l];};
+  for(const A of strokes){
+    if(!A||A.kai2||A.t!=="pie"||!A.p||A.p.length<2||A._fold) continue;
+    if(A.e&&A.e!=="taperL"&&A.e!=="open") continue;
+    const n=A.p.length-1, P=A.p[n], da=U([P[0]-A.p[n-1][0],P[1]-A.p[n-1][1]]);
+    let best=null;
+    for(const B of strokes){
+      if(B===A||!B||B.kai2||!B.p||B.p.length<2||B._foldH) continue;
+      if(!(B.t==="heng"||B.t==="na"||B.t==="dian"||B.t==="ti")) continue;
+      if(B.h&&B.h!=="open"&&B.h!=="point") continue;
+      const Q=B.p[0], d=Math.hypot(Q[0]-P[0],Q[1]-P[1]);
+      if(d>42) continue;
+      const db=U([B.p[1][0]-Q[0],B.p[1][1]-Q[1]]);
+      if(da[0]*db[0]+da[1]*db[1]>0.5) continue;        /* 轉不到 60°，不是折 */
+      if(!best||d<best.d) best={B,d};
+    }
+    if(!best) continue;
+    const B=best.B;
+    B.p=B.p.map((q,k)=>k===0?[P[0],P[1]]:q);
+    A.e="conn"; B.h="conn"; A._fold=1; B._foldH=1;
+  }
+  return strokes;
+}
 function trimTerminalCrossingsSafe(strokes,f){
   const hit=(A,B,C,D)=>{
     const rx=B[0]-A[0], ry=B[1]-A[1], sx=D[0]-C[0], sy=D[1]-C[1];
@@ -8224,7 +8260,7 @@ function glyphContours(id,f,variant,NS){
     if(Date.now()-CS_T0 > CS_BUDGET_MS) counterOn=false;
   }
   const outlineNS=counterOn ? Math.max(20,NS||0) : NS;
-  const prepared=trimTerminalCrossingsSafe(protectWhite(warp(raw,f),f),f);
+  const prepared=trimTerminalCrossingsSafe(joinPieFolds(protectWhite(warp(raw,f),f)),f);
   const marked=markCorners(prepared,f);
   /* ★ v217：算出每一筆屬於第幾「畫」（運筆）。
      KAGE 常把橫折拆成兩筆（「口」是 4 筆：左竖／上横／右竖／底横），
