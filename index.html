@@ -2,7 +2,7 @@
 <!--
 ================================================================================
   方寸 FANGCUN — 參數化中文字型工作室
-  Copyright (c) 2026 DBeast and Fangcun contributors.
+  Copyright (c) 2026 termcave and Fangcun contributors.
 
   This Source Code Form is subject to the terms of the Mozilla Public
   License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -15,7 +15,7 @@
 <!--
 ================================================================================
   方寸 FANGCUN — 參數化中文字型工作室
-  https://github.com/beastt1992   ·   DBeast
+  https://www.threads.net/@termcavetw   ·   termcave
 
   方寸的原創程式碼採 Mozilla Public License 2.0（MPL-2.0）。
   MPL 是「以檔案為單位」的著作傳染：改動本檔要沿用 MPL 並公開，
@@ -4495,7 +4495,7 @@ function vertXform(cmds, mode){
 
 /* ==========================================================================
    內白保護
-   想法出自 David：「設定假的中間線再 offset，所以會有邊界。」
+   想法出自作者：「設定假的中間線再 offset，所以會有邊界。」
    字照畫，最後把「該留白卻被擠掉」的地方挖掉 —— 白縫是被保證的，
    不是靠筆畫剛好沒碰到。是後製，所以局部、可關、而且沿用既有的布林運算。
 
@@ -6607,7 +6607,7 @@ AXES.forEach(ax=>{
   const b=document.createElement("div"); b.className="ctrl";
   b.innerHTML='<div class="ctrl-head"><label for="famIn">字型名稱</label>'+
     '<span class="ro">NAME</span></div>'+
-    '<input type="text" id="famIn" spellcheck="false" placeholder="中文名，例如 青埔黑體">'+
+    '<input type="text" id="famIn" spellcheck="false" placeholder="中文名，例如 方寸黑體">'+
     '<input type="text" id="latIn" spellcheck="false" placeholder="英文名（PostScript 用，限 A-Z）">';
   $("ctrls").appendChild(b);
   $("famIn").value=FAMILY; $("latIn").value=LATIN;

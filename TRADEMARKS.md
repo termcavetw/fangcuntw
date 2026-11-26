@@ -37,9 +37,9 @@
 
 ## 聯絡
 
-需要使用品牌名稱、Logo 或官方視覺進行合作、媒體報導、教學或商業授權時，請透過作者頁面聯絡：
+需要使用品牌名稱、Logo 或官方視覺進行合作、媒體報導、教學或商業授權時，請透過作者的 Threads 聯絡：
 
-https://github.com/beastt1992
+https://www.threads.net/@termcavetw（@termcavetw）
 
 ---
 
