@@ -128,8 +128,8 @@ visual guard：cleanup 後如果畫面改變超過門檻就拒絕
 SVG path / OTF
 ```
 
-Generator：`[FILL: GitHub URL]`  
-互動版：`[FILL: app URL]`
+Generator：https://github.com/termcavetw/fangcuntw  
+互動版：https://fangcun.termcavetw.com
 
 ### Sampling strategy
 
@@ -236,6 +236,6 @@ Source: https://glyphwiki.org/wiki/GlyphWiki:データ・記事のライセン�
 
 ## Contact / feedback
 
-`[FILL: GitHub Issues / contact]`
+GitHub Issues：https://github.com/termcavetw/fangcuntw/issues ・ Threads：[@termcavetw](https://www.threads.net/@termcavetw)
 
 如果你發現某一類生成外框有系統性問題，歡迎開 issue。參數化 generator 的好處之一，是 renderer 層的一次修正有機會同時改善大量字形，之後再重新生成資料集。

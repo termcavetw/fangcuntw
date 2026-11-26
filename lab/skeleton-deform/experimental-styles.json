@@ -1,0 +1,114 @@
+{
+ "movie": {
+  "name": "電影海報",
+  "base": "hei",
+  "params": {
+   "weight": 96,
+   "contrast": 1.05,
+   "taper": 0,
+   "round": 0,
+   "cap": 0,
+   "width": 0.72,
+   "face": 1.1,
+   "skocto": 1,
+   "skvsnap": 25,
+   "skeven": 1,
+   "skext": -0.15,
+   "hook": 0,
+   "hookst": 3,
+   "optic": 1
+  }
+ },
+ "speed": {
+  "name": "速度感",
+  "base": "hei",
+  "params": {
+   "slant": 0.25,
+   "rise": 0.12,
+   "skspread": 12,
+   "skext": 0.4,
+   "taper": 1.4,
+   "spike": 0.5,
+   "weight": 92,
+   "contrast": 1.3
+  }
+ },
+ "gothic": {
+  "name": "哥德",
+  "base": "ming",
+  "params": {
+   "spike": 1.2,
+   "contrast": 1.8,
+   "finish": 0.8,
+   "weight": 96,
+   "skocto": 1,
+   "skvsnap": 20,
+   "width": 0.86
+  }
+ },
+ "wideming": {
+  "name": "寬扁明",
+  "base": "ming",
+  "params": {
+   "width": 1.16,
+   "contrast": 1.9,
+   "finish": 0.9,
+   "weight": 66,
+   "skspread": 10,
+   "skext": 0.3,
+   "gravity": 1.1
+  }
+ },
+ "neon": {
+  "name": "霓虹管",
+  "base": "hei",
+  "params": {
+   "weight": 96,
+   "contrast": 1,
+   "taper": 0,
+   "round": 1,
+   "cap": 1,
+   "skocto": 1,
+   "skdotv": 1,
+   "skvsnap": 20,
+   "hook": 0,
+   "hookst": 3,
+   "hollow": 0.42,
+   "optic": 1,
+   "width": 0.94
+  }
+ },
+ "bubble": {
+  "name": "膨膨糖",
+  "base": "yuan",
+  "params": {
+   "inflate": 0.7,
+   "round": 1,
+   "cap": 1,
+   "weight": 92,
+   "skdotv": 1,
+   "skocto": 0.6,
+   "optic": 1,
+   "counter": 0.92
+  }
+ },
+ "sign": {
+  "name": "招牌黑",
+  "base": "hei",
+  "params": {
+   "hgrid": 1,
+   "bleed": 0.6,
+   "skocto": 1,
+   "skeven": 1,
+   "round": 0,
+   "cap": 0,
+   "weight": 98,
+   "taper": 0,
+   "hook": 0,
+   "hookst": 3,
+   "optic": 1,
+   "skdotv": 1,
+   "width": 1.06
+  }
+ }
+}
