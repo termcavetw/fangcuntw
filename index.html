@@ -3332,10 +3332,15 @@ function endFactor(kind,x,f,st,isTail){
       if(x>0.30) return 1;                    /* 筆身維持等粗 */
       if(x>=BULGE){                           /* 進轉折前先頓出來 */
         const u=(0.30-x)/(0.30-BULGE);
-        return 1+0.34*u*u;
+        /* v270 明體的頓收小（0.34→0.12），不然鉤根鼓成一隻靴子 */
+        const gB=clamp(((f&&f.finish)||0)-0.5,0,0.4)/0.4;
+        return 1+(0.34-0.22*gB)*u*u;
       }
       const u=x/BULGE;                        /* 鉤身：從頓收到尖 */
-      return Math.max(0.26,0.26+1.08*Math.pow(u,0.80));
+      /* v270 明體的鉤尖收到很細（Noto Serif 的亅是尖的），原本 0.26 下限像一隻靴子。
+         收筆（finish）0.5 以上才漸入，黑體、楷書不變。 */
+      const gM=clamp(((f&&f.finish)||0)-0.5,0,0.4)/0.4, tipW=0.26-0.18*gM, top=1.34-0.22*gM;
+      return Math.max(tipW,tipW+(top-tipW)*Math.pow(u,0.80));
     }
     case "bend":   return 0.74+0.26*Math.pow(x,0.60);  /* 彎尾略收，但不畫成鉤 */
     case "kakato": return 1+0.08*Math.pow(1-x,2);      /* 腳跟靠端點微微加厚 */
@@ -3942,8 +3947,10 @@ function appendKageTail(S,st,f,wScale){
   if(st.e==="hook"){
     /* 左上挑鉤。往左的量要遠大於往上，才是 18° 那種橫掃的鉤。
        控制點壓低，讓豎與鉤之間形成明顯轉折而不是平滑續接。 */
+    /* v270 明體的鉤往左上挑得比較高（Noto Serif 約 30°，原本 11°） */
+    const gM=clamp((f.finish||0)-0.5,0,0.4)/0.4;
     C=[A[0]-m*0.46,A[1]-m*0.04];
-    B=[A[0]-m*1.50,A[1]+m*0.30];
+    B=[A[0]-m*(1.50-0.15*gM),A[1]+m*(0.30+0.55*gM)];
   }else{
     /* KAGE 的 5 是右上彎尾，常見於力、門、月等折鉤。 */
     C=[A[0]+m*0.58,A[1]+m*0.02];
@@ -4388,6 +4395,8 @@ function strokeOutline(st,f,wScale,NS){
     const HK=["flat","pt",1,"flat","pt"];      /* 依筆意／尖鉤／圓鉤／平鉤／長挑 */
     const k=Math.round(f.hookst||0);
     C.b=HK[k]!==undefined?HK[k]:"flat";
+    /* v270 明體「依筆意」的鉤收成尖（收筆 ≥0.7 才換，端帽種類不影響節點數以外的拓樸） */
+    if(k===0 && (f.finish||0)>=0.7) C.b="pt";
   }
   else if(tail.kind==="bend") C.b=Math.min(f.round,0.22);
   const T0=unit(S[0].t),T1=unit(S[n].t);
@@ -7024,8 +7033,10 @@ function warpStroke(st,f){
     p=p.map(([x,y])=>[c[0]+(x-c[0])*ca-(y-c[1])*sa, c[1]+(x-c[0])*sa+(y-c[1])*ca]);
     if(qc) qc=qc.map(([x,y])=>[c[0]+(x-c[0])*ca-(y-c[1])*sa, c[1]+(x-c[0])*sa+(y-c[1])*ca]);
   }
-  if(st.t==="heng"&&f.finish>0&&p.length===2){
-    const dy=f.finish*13;
+  /* v270：收筆讓橫尾上揚 13×finish 是手寫的習慣，明體（書寫感 0）不該有 ——
+     「口、國」的框會歪（Noto Serif 的橫是平的）。改成跟著書寫感（hand）走，0.33 以上才全量。 */
+  if(st.t==="heng"&&f.finish>0&&p.length===2&&(f.hand||0)>0){
+    const dy=f.finish*13*clamp((f.hand||0)*3,0,1);
     p[1]=[p[1][0],p[1][1]+dy];
     if(qc&&qc.length) qc[qc.length-1]=[qc[qc.length-1][0],qc[qc.length-1][1]+dy];
   }
@@ -7971,6 +7982,41 @@ let CS_T0=-1;
 const CS_BUDGET_MS=1200;
 function csBudgetReset(){ CS_T0=-1; PH_T0=-1; }
 /* ==========================================================================
+   v270 明體的橫折肩
+   Noto Serif、標楷以外的明體，「口、國、月」右上角的橫折會在轉角上方
+   鼓出一個尖肩（橫收筆的三角延續到豎的起筆）。原本這裡只是兩筆方方地接起來。
+   找法：橫的尾端（往右）跟豎的起頭（往下）在 CORNER_TOL 內相接 → 在轉角補一塊肩。
+   大小跟著收筆（finish）走，0.5 以下不做；只依骨架位置判斷，不隨字重翻面（VF 安全）。
+   ========================================================================== */
+function mingShoulders(strokes,f){
+  const g=clamp(((f.finish||0)-0.5)/0.45,0,1);
+  if(g<=0) return [];
+  const out=[];
+  for(let i=0;i<strokes.length;i++){
+    const H=strokes[i]; if(!H||H.kai2||!H.p||H.p.length<2||H.t!=="heng") continue;
+    const n=H.p.length-1, E=H.p[n], dh=unit([E[0]-H.p[n-1][0],E[1]-H.p[n-1][1]]);
+    if(dh[0]<0.85) continue;                                   /* 橫要往右 */
+    for(let j=0;j<strokes.length;j++){
+      if(j===i) continue;
+      const V=strokes[j]; if(!V||V.kai2||!V.p||V.p.length<2) continue;
+      const S0=V.p[0];
+      if(Math.abs(S0[0]-E[0])>=CORNER_TOL||Math.abs(S0[1]-E[1])>=CORNER_TOL) continue;
+      const dv=unit([V.p[1][0]-S0[0],V.p[1][1]-S0[1]]);
+      if(dv[1]>-0.85) continue;                                /* 豎要往下 */
+      const hh=Math.max(1,widthAt(H,1,[dh[0],dh[1]],f)*(H.ws||1)/2);
+      const hs=Math.max(1,widthAt(V,0,[dv[0],dv[1]],f)*(V.ws||1)/2);
+      const x=S0[0], yT=E[1]+hh;                               /* 橫的上緣 */
+      const Hh=hs*1.45*g;                                      /* 肩高（Noto Serif 約一個豎寬半） */
+      const pts=[[x-hs*2.4,yT-0.5],[x+hs*0.25,yT+Hh],[x+hs,yT-hs*0.7*g],[x+hs,E[1]-hh],[x-hs*2.4,E[1]-hh]];
+      const cmds=[["M",pts[0][0],pts[0][1]]];
+      for(let k=1;k<pts.length;k++) cmds.push(["L",pts[k][0],pts[k][1]]);
+      const c=orient(cmds,-1); c.si=j; out.push(c);
+      break;
+    }
+  }
+  return out;
+}
+/* ==========================================================================
    v261 畫面針孔補墨（fillPinholes）
    匯出的靜態字型在 finalizeContours 會把 PINHOLE_MAX 以下的洞丟掉，
    但畫面是逐筆各自填色，筆與筆交會圍出的小白洞（撇折折點、橫折內角、
@@ -8649,6 +8695,7 @@ function glyphContours(id,f,variant,NS){
   /* v227 接點覆蓋補丁：Coverage first —— 補的是畫面與匯出共同的接點白洞，
      跟補墨四邊形一樣標 si，跟著自己的筆一起上色。 */
   for(const c of junctionPatches(marked,f)){ if(c.si!==undefined) c.mi=mi[c.si]; out.push(c); }
+  for(const c of mingShoulders(marked,f)){ if(c.si!==undefined) c.mi=mi[c.si]; out.push(c); }
   /* v261 畫面針孔補墨：匯出本來就會丟掉的小洞，畫面也一起補（VF 不做）。
      中空軸開著時不補：補丁讓中空的布林運算失敗，整個字退回實心（審查抓到）。 */
   PH_SKIP=(f.hollow||0)>0.01;
@@ -8920,7 +8967,10 @@ const PRESETS={
   /* v267 圓體：撇捺幾乎不收尖（1.00→0.25）、鉤 0.75、中宮放寬 0.90→1.00；折角改成圓角接（見 strokeOutline）。
      收尖 0 的話密字的小白洞多 78%（1,874 字抽樣 405→720），0.25＋字重 77 折衷在 549，黑度維持原樣。 */
   yuan:{weight:77,optic:0.45,contrast:1.00,round:1.00,counter:1.00,gravity:0.97,face:1.03,hand:0.06,finish:0,width:1.00,slant:0,taper:0.25,hook:0.75,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:1.00,cmin:0},
-  ming:{weight:60,optic:0.35,contrast:2.10,round:0.04,counter:1.08,gravity:1.03,face:1.05,hand:0,finish:0.95,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.85,press:0.25,rise:0.045,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.04,cmin:0},
+  /* v270 明體精修（對照 Noto Serif TC）：橫改平（rise 0.045→0、收筆上揚改跟書寫感走）、
+     對比 2.10→3.00（橫更細）、字重 60→56、提按 0.25→0、頓 0.85→0.40、鉤 1.00→1.40；
+     另有引擎端的橫折肩與尖鉤（見 mingShoulders、appendKageTail）。 */
+  ming:{weight:56,optic:0.35,contrast:3.00,round:0.04,counter:1.08,gravity:1.03,face:1.05,hand:0,finish:0.95,width:1.00,slant:0,taper:1.00,hook:1.40,dun:0.40,press:0.00,rise:0.000,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.04,cmin:0},
   hand:{weight:88,optic:0.30,contrast:1.30,round:0.78,counter:0.88,gravity:0.94,face:1.01,hand:0.85,finish:0.34,width:1.00,slant:0,taper:0.85,hook:1.00,dun:0.55,press:0.95,rise:0.100,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.78,cmin:0},
   /* v269 標題黑：字懷保護 0.6（擠在一起的筆變細，不用切縫），字重 128→140 補回疏字的份量。
      墨量：一十口 +5%、常用字 −9%、繁鬱龍灣 −13% —— 密字變淡，整行灰度比較平均。 */
