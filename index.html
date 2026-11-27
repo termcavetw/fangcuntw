@@ -4732,13 +4732,15 @@ function kaiSectionSweepContours(st,f,wScale){
     for(let i=0;i+1<P.length;i++){
       const p=P[i],q=P[i+1],dx=q[0]-p[0],dy=q[1]-p[1],L=Math.hypot(dx,dy);
       const r0=Math.max(.2,(S[i].l+S[i].r)/2),r1=Math.max(.2,(S[i+1].l+S[i+1].r)/2);
-      if(L<1e-6){ pieces.push(orient(circleContour(p[0],p[1],Math.max(r0,r1)),-1)); continue; }
-      /* 若大圓完整包含小圓，這一小段的 union 就是大圓。 */
-      if(Math.abs(r1-r0)>=L){
+      if(L<1e-6 && !VF_STABLE){ pieces.push(orient(circleContour(p[0],p[1],Math.max(r0,r1)),-1)); continue; }
+      /* 若大圓完整包含小圓，這一小段的 union 就是大圓。
+         ★ VF_STABLE 不走這兩條捷徑：半徑隨字重變，會不會走捷徑也跟著變，輪廓數就對不上。 */
+      if(Math.abs(r1-r0)>=L && !VF_STABLE){
         const z=r1>=r0?[q,r1]:[p,r0]; pieces.push(orient(circleContour(z[0][0],z[0][1],z[1]),-1));
         continue;
       }
-      const ux=dx/L,uy=dy/L,nx=-uy,ny=ux,k=(r1-r0)/L,s=Math.sqrt(Math.max(0,1-k*k));
+      const Ls=Math.max(L,1e-6),ux=L>1e-6?dx/Ls:1,uy=L>1e-6?dy/Ls:0,nx=-uy,ny=ux,
+            k=clamp((r1-r0)/Ls,-1,1),s=Math.sqrt(Math.max(0,1-k*k));
       const edge=(c,r,sg)=>[c[0]+r*(-k*ux+sg*s*nx),c[1]+r*(-k*uy+sg*s*ny)];
       const poly=[edge(p,r0,1),edge(q,r1,1),edge(q,r1,-1),edge(p,r0,-1)];
       pieces.push(orient([["M",poly[0][0],poly[0][1]],["L",poly[1][0],poly[1][1]],
@@ -4749,7 +4751,16 @@ function kaiSectionSweepContours(st,f,wScale){
   }else{
     /* 相鄰剖面切成兩個單純三角形再 union。這與整條 ribbon 的墨區相同，
        但不會因急轉形成 bow-tie 自交。A/B 不做平滑，保留右二的實測剪影。 */
-    for(let i=0;i+1<P.length;i++){
+    /* ★ 可變字型（VF_STABLE）：三角形 union 後的節點數會隨字重變，主體對不起來。
+       改成一條固定點數的帶子（A 去、B 回），急轉處可能自交，但 nonzero 照樣是墨；
+       可變字型本來就保留重疊、不做聯集。 */
+    if(VF_STABLE){
+      const rib=[["M",A[0][0],A[0][1]]];
+      for(let i=1;i<P.length;i++) rib.push(["L",A[i][0],A[i][1]]);
+      for(let i=P.length-1;i>=0;i--) rib.push(["L",B[i][0],B[i][1]]);
+      pieces.push(orient(rib,-1));
+    }
+    else for(let i=0;i+1<P.length;i++){
       const tris=[[A[i],A[i+1],B[i]],[B[i],A[i+1],B[i+1]]];
       for(const z of tris){
         const ar=Math.abs((z[1][0]-z[0][0])*(z[2][1]-z[0][1])-(z[1][1]-z[0][1])*(z[2][0]-z[0][0]));
@@ -4768,7 +4779,7 @@ function kaiSectionSweepContours(st,f,wScale){
         if(bend<.0018) continue;
         /* v257：max 不再只增加 18%；轉角圓化必須在小字預覽也可辨識。 */
         const rad=(S[i].l+S[i].r)*.5*(.95+.55*rr)*clamp(bend*24,0,1);
-        if(rad>1.2) pieces.push(orient(circleContour(P[i][0],P[i][1],rad),-1));
+        if(rad>1.2 || VF_STABLE) pieces.push(orient(circleContour(P[i][0],P[i][1],Math.max(rad,.3)),-1));
       }
     }
     const last=P.length-1,
@@ -4782,6 +4793,7 @@ function kaiSectionSweepContours(st,f,wScale){
     /* 鉤已由 kaiHookAdjustedPoints() 在同一條中心線上完成，不再 append 第二鉤。 */
   }
   if(!pieces.length) return [];
+  if(VF_STABLE) return pieces;   /* 聯集的節點數隨字重變，可變字型保留各片重疊 */
   /* TOL 很小：只消除浮點重複點，不把實測外緣重新造型。 */
   return dedupContours(pieces,3,.12);
 }
