@@ -3203,6 +3203,8 @@ const dist=(a,b)=>len(sub(a,b));
 const lerp=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];
 const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a||1e-6)));return t*t*(3-2*t);};
 
+/* 圓角最多吃掉每段的幾成。原樣照 KAGE 時放寬到 0.98（KAGE 不夾，見 strokeOutline） */
+let SEG_LEGCAP=0.42;
 function makeSegs(pts,bend,fillet,cv,kj,qc){
   const segs=[];
   /* v228：真楷資料每兩站之間有一個實測二次貝茲控制點，直接交給 renderer。
@@ -3255,7 +3257,7 @@ function makeSegs(pts,bend,fillet,cv,kj,qc){
     const P=pts[i],N=pts[i+1];
     const leg1=dist(cur,P),leg2=dist(P,N);
     const joinScale=kj===4?clamp(leg2/150,0.58,1.18):(kj===3?0.78:1);
-    const r=Math.min(fillet*joinScale,leg1*0.42,leg2*0.42);
+    const r=Math.min(fillet*joinScale,leg1*SEG_LEGCAP,leg2*SEG_LEGCAP);
     const A1=add(P,mul(unit(sub(cur,P)),r)), B1=add(P,mul(unit(sub(N,P)),r));
     if(dist(cur,A1)>1) segs.push({q:0,a:cur,b:A1});
     segs.push({q:1,a:A1,c:P,b:B1});
@@ -4127,7 +4129,18 @@ function strokeOutline(st,f,wScale,NS){
   /* 真楷八段 quadratic 跟 smooth 一樣使用高密度固定取樣。低密度雖然畫面看不出，
      outline 清理在不同字重會跨門檻，造成可變字型節點數跳動。 */
   const sampleN=(NS||30)+((st.cv==="smooth"||QC)?46:(st.kage&&(st.cv||st.t==="zhe")?8:0));
-  const baseS=sampleSkeleton(SP,st.bend||0,fillet,sampleN,st.cv,st.kj,QC);
+  /* v268 原樣的 KAGE 轉角：退距 cut 用 KAGE 原始第二段長（rate 的定義），
+     但 makeSegs 的 joinScale 看的是延伸後的段長，要用 SP 重算；而且不夾四成（KAGE 不夾）。 */
+  let kageExact=false;
+  if(f.miter===0 && st.kage && (st.kj===3||st.kj===4) && SP.length===3 && !st.kai2){
+    const cut=st.kj===3 ? 50 : 50*Math.min(6, dist(st.p[1],st.p[2])/100);
+    const js=st.kj===4?clamp(dist(SP[1],SP[2])/150,0.58,1.18):0.78;
+    fillet=cut/js; kageExact=true;
+  }
+  if(kageExact) SEG_LEGCAP=0.98;
+  let baseS;
+  try{ baseS=sampleSkeleton(SP,st.bend||0,fillet,sampleN,st.cv,st.kj,QC); }
+  finally{ SEG_LEGCAP=0.42; }
   const tail=appendKageTail(baseS,st,f,wScale),S=tail.s,n=S.length-1;
   /* 頓：折角處把筆畫局部加粗。真的毛筆在轉折時會停頓下壓，
      黑體留一點意思、明體要明顯。沒有轉折的筆畫完全不受影響。 */
@@ -10437,6 +10450,8 @@ function getWorker(){
 }
 function cmdsOf(id,NS){
   const out=[];
+  /* v268：匯出每個字都給完整的畫面處理額度（針孔補墨、內白），結果才不會隨匯出速度變 */
+  csBudgetReset();
   let cs=glyphContours(id,FA(),null,NS);
   if(DEDUP_ON) cs=finalizeContours(cs,{variableCompatible:VF_STABLE});
   for(const c of cs){
@@ -10453,6 +10468,7 @@ function cmdsOf(id,NS){
 }
 function cmdsOfF(id,NS,f){
   const out=[];
+  csBudgetReset();
   let cs=glyphContours(id,f,null,NS);
   if(DEDUP_ON) cs=finalizeContours(cs,{variableCompatible:VF_STABLE});
   for(const c of cs){
