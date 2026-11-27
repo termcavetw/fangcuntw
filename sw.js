@@ -14,8 +14,11 @@ if (self.location.hostname === "fangcuntw.vercel.app") {
     await self.registration.unregister();
   })()));
 } else {
-const CACHE = "fangcun-v264-kaibeta";   /* 換版本號 → 舊快取會被清掉，使用者不用重整兩次 */
-const CORE_ASSETS = ["./", "./index.html", "./manifest.webmanifest"];
+const CACHE = "fangcun-v265-slim";
+/* 正楷體字型檔獨立一個快取，換版不清掉（檔案內容永遠不變，免得每次更新都重下 19 MB） */
+const KAI_CACHE = "fangcun-twkai-98_1";   /* 換版本號 → 舊快取會被清掉，使用者不用重整兩次 */
+/* v265：只快取 "./" 一份。原本 "./" 和 "./index.html" 各存一份完整的 app，等於下載兩次。 */
+const CORE_ASSETS = ["./", "./manifest.webmanifest"];
 const OPTIONAL_ASSETS = [
   "./icon.svg", "./icon-192.png", "./icon-512.png", "./favicon-32.png", "./apple-touch-icon.png",
   "./icon-mask-192.png", "./icon-mask-512.png"
@@ -36,7 +39,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== KAI_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -54,7 +57,17 @@ self.addEventListener("fetch", e => {
       fetch(req).then(res => {
         if (res && res.ok) { const c = res.clone(); caches.open(CACHE).then(k => k.put(req, c)); }
         return res;
-      }).catch(() => caches.match(req).then(hit => hit || caches.match("./index.html")))
+      }).catch(() => caches.match(req).then(hit => hit || caches.match("./")))
+    );
+    return;
+  }
+  /* v265：正楷體字型檔（19 MB、內容永遠不變）只下載一次：有快取就直接用，不在背景重抓 */
+  if (url.pathname.endsWith("/tw-kai-98_1.bin")) {
+    e.respondWith(
+      caches.match(req).then(hit => hit || fetch(req).then(res => {
+        if (res && res.ok) { const c = res.clone(); caches.open(KAI_CACHE).then(k => k.put(req, c)); }
+        return res;
+      }))
     );
     return;
   }
