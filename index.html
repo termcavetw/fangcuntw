@@ -7270,7 +7270,12 @@ function segDist(a,b,c,d){
   return Math.hypot(px,py);
 }
 function protectWhite(strokes,f){
-  const t=f.wspace||0;
+  /* v269：字重拉到 110 以上自動開一點字懷保護（160 時 0.5），粗字不再糊成黑塊；
+     使用者自己開的值比較大就用使用者的。 */
+  /* ★ 可變字型：各主體字重不同，變細量若跟著字重算，下游的鉤／裁切判斷會翻面、節點對不上。
+     VF_STABLE 時一律用出廠字重來算（自動那一段因此不作用，只剩預設明寫的 wspace）。 */
+  const fw=VF_STABLE?{...f,weight:F_DEFAULT.weight}:f;
+  const t=Math.max(f.wspace||0, 0.6*clamp(((Number(fw.weight)||0)-110)/60,0,1));
   if(!(t>0) || strokes.length<2) return strokes;
   /* ★ 這兩個值試過三組才定下來：
        target 40 / FLOOR 0.55 → 過擠少一半，但墨量掉到 75%（等於偷偷細了兩個字重）
@@ -7282,8 +7287,8 @@ function protectWhite(strokes,f){
   const half=[], scale=strokes.map(()=>1);
   for(const st of strokes){
     let w;
-    try{ w=widthAt(st,0.5,st.p.length>1?[st.p[1][0]-st.p[0][0],st.p[1][1]-st.p[0][1]]:[1,0],f)*(st.ws||1)/2; }
-    catch(e){ w=Math.max(widths(f).hw,widths(f).sw)/2; }
+    try{ w=widthAt(st,0.5,st.p.length>1?[st.p[1][0]-st.p[0][0],st.p[1][1]-st.p[0][1]]:[1,0],fw)*(st.ws||1)/2; }
+    catch(e){ w=Math.max(widths(fw).hw,widths(fw).sw)/2; }
     half.push(Math.max(1,w));
   }
   for(let i=0;i<strokes.length;i++){
@@ -8917,7 +8922,9 @@ const PRESETS={
   yuan:{weight:77,optic:0.45,contrast:1.00,round:1.00,counter:1.00,gravity:0.97,face:1.03,hand:0.06,finish:0,width:1.00,slant:0,taper:0.25,hook:0.75,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:1.00,cmin:0},
   ming:{weight:60,optic:0.35,contrast:2.10,round:0.04,counter:1.08,gravity:1.03,face:1.05,hand:0,finish:0.95,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.85,press:0.25,rise:0.045,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.04,cmin:0},
   hand:{weight:88,optic:0.30,contrast:1.30,round:0.78,counter:0.88,gravity:0.94,face:1.01,hand:0.85,finish:0.34,width:1.00,slant:0,taper:0.85,hook:1.00,dun:0.55,press:0.95,rise:0.100,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.78,cmin:0},
-  title:{weight:128,optic:0.62,contrast:1.00,round:0.10,counter:0.82,gravity:1.00,face:1.11,hand:0,finish:0,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.10,cmin:0},
+  /* v269 標題黑：字懷保護 0.6（擠在一起的筆變細，不用切縫），字重 128→140 補回疏字的份量。
+     墨量：一十口 +5%、常用字 −9%、繁鬱龍灣 −13% —— 密字變淡，整行灰度比較平均。 */
+  title:{weight:140,wspace:0.6,optic:0.62,contrast:1.00,round:0.10,counter:0.82,gravity:1.00,face:1.11,hand:0,finish:0,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.10,cmin:0},
   /* 原樣：對照 KAGE 官方黑體的輸出調出來的，最貼近 GlyphWiki 資料本來的樣子 */
   kai:{weight:88,optic:0.35,contrast:1.25,round:0.30,counter:0.96,gravity:0.99,face:1.02,hand:0.10,finish:0.30,width:1.00,slant:0,taper:0.85,hook:1.06,dun:1.00,press:3.00,rise:0.114,kskel:1,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.30,cmin:0},
   /* v258 幾何標題：同一份 KAGE 骨架，經間架軸長出來的新字體。
