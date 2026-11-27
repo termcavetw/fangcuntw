@@ -3498,8 +3498,8 @@ function widthAt(st,t,tan,f){
   /* KAGE 頭尾語意是修飾層，不再取代撇／捺／點／提本身的粗細邏輯。 */
   /* v258：被裁進另一筆裡的端點不收尖 —— 收細之後再切平，會在接點留一片
      薄薄的旗子翹出對方的墨外（實機：明體「經」糸旁撇折接長撇的地方）。 */
-  if(st.h&&!st._trimH) w*=endFactor(st.h,t,f,st,false);
-  if(st.e&&!st._trimE) w*=endFactor(st.e,1-t,f,st,true);
+  if(st.h&&st._trimH!==1) w*=endFactor(st.h,t,f,st,false);
+  if(st.e&&st._trimE!==1) w*=endFactor(st.e,1-t,f,st,true);
   if(st.kage){
     const {hw,sw}=widths(f),k=st.w||1;
     const s=Math.abs(tan[1])/Math.max(1e-6,len(tan));
@@ -7360,17 +7360,20 @@ function trimTerminalCrossingsSafe(strokes,f){
         const h=hit(st.p[0],st.p[1],U,V);
         if(h && h.t>0.02 && h.t<0.40 && h.u>0.06 && h.u<0.94){
           const over=Math.hypot(st.p[0][0]-h.p[0],st.p[0][1]-h.p[1]);
-          if(over>1.0 && over<=limO && (!bestH||over<bestH.over)) bestH={...h,over};
+          if(over>1.0 && over<=limO && (!bestH||over<bestH.over)) bestH={...h,over,cv:ot.p.length>2||over>lim};
         }
         const e=hit(st.p[n-1],st.p[n],U,V);
         if(e && e.t>0.60 && e.t<0.98 && e.u>0.06 && e.u<0.94){
           const over=Math.hypot(st.p[n][0]-e.p[0],st.p[n][1]-e.p[1]);
-          if(over>1.0 && over<=limO && (!bestE||over<bestE.over)) bestE={...e,over};
+          if(over>1.0 && over<=limO && (!bestE||over<bestE.over)) bestE={...e,over,cv:ot.p.length>2||over>lim};
         }
       }
     }
-    if(bestH){ st.p[0]=bestH.p; st._trimH=1; }
-    if(bestE){ st.p[n]=bestE.p; st._trimE=1; }
+    /* 記 2 的端點保留原本的收尖：①被弧線裁（交點用控制點折線算，跟實際弧線有落差）
+       ②只因為對方夠粗才裁到（limO 放寬的部分）—— 對方多半是點或細撇，
+       不收尖的方頭比它寬，角會露出來，在旁邊圍出楔形白洞（原樣「譏饑鞿」的幺）。 */
+    if(bestH){ st.p[0]=bestH.p; st._trimH=bestH.cv?2:1; }
+    if(bestE){ st.p[n]=bestE.p; st._trimE=bestE.cv?2:1; }
   }
   return strokes;
 }
