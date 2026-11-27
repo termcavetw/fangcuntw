@@ -1345,6 +1345,8 @@
 <script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>
 <script defer src="/_vercel/insights/script.js"></script>
 <style id="ui-foundry">
+/* v264 楷書標 β：骨架資料還在整理，只有約一百多字是精修過的 */
+#presets button[data-p="kai"]::after,#scPreset button[data-p="kai"] .pth-n::after,#smapThumbs button[data-p="kai"] .pth-n::after{content:" β";font-size:.85em;opacity:.7}
 /* ==========================================================================
    v259 介面改版「字體工坊」
    參考字型公司試字頁：白底、大留白、膠囊分段按鈕、單一強調色（亮藍）。
@@ -4746,6 +4748,21 @@ function kaiSectionSweepContours(st,f,wScale){
        renderer 必須交換回來：Python left=-normal*wl、right=+normal*wr。 */
     A.push([P[i][0]-nx*sec.r,P[i][1]-ny*sec.r]);
     B.push([P[i][0]+nx*sec.l,P[i][1]+ny*sec.l]);
+  }
+  /* v264：剖面寬度輕度低通。實測剖面是逐站量的，量化誤差讓邊緣一顫一顫；
+     1-2-1 兩遍只壓單站跳動，頓筆、收筆這種連續好幾站的粗細變化保留。頭尾兩站不動（端帽要接得上）。 */
+  if(!st.repair && S.length>6){
+    for(let pass=0;pass<2;pass++){
+      const L0=S.map(q=>q.l),R0=S.map(q=>q.r);
+      for(let i=2;i<S.length-2;i++){
+        S[i]={...S[i],l:(L0[i-1]+2*L0[i]+L0[i+1])/4,r:(R0[i-1]+2*R0[i]+R0[i+1])/4};
+      }
+    }
+    for(let i=2;i<S.length-2;i++){
+      const tx=T[i][0],ty=T[i][1],nx=-ty,ny=tx;
+      A[i]=[P[i][0]-nx*S[i].r,P[i][1]-ny*S[i].r];
+      B[i]=[P[i][0]+nx*S[i].l,P[i][1]+ny*S[i].l];
+    }
   }
   const pieces=[];
   if(st.repair){
@@ -8420,12 +8437,19 @@ function skelDeformApply(raw,f,id,variant){
     return o;
   });
 }
+let KAI_FB_WS=0.58;   /* 楷書退回字的筆寬倍率（實測墨量對齊真楷） */
 function collectRenderStrokes(id,f,variant){
   const raw=[];
   collect(id,[0,0,EM,EM],1,raw,7,variant,0,f.optic,f.pratio);
   const amount=clamp(Number(f&&f.kskel)||0,0,1), kai=KAI_SKEL[id];
   /* v258：KAGE 骨架這條路徑套用間架軸（楷體剖面資料是實測中心線，不在這裡動） */
-  if(amount<=0.0001||!Array.isArray(kai)||kai.length!==raw.length) return skelDeformApply(raw,f,id,variant);
+  if(amount<=0.0001||!Array.isArray(kai)||kai.length!==raw.length){
+    /* v264：楷書預設遇到沒有楷書骨架的字，退回 KAGE 骨架照楷書軸畫。
+       KAGE 骨架的筆比實測楷書粗很多（同字重墨量約 1.86 倍），整行字會一深一淺；
+       這裡把退回字的筆寬壓到跟真楷同黑度。 */
+    if(amount>=0.999 && KAI_FB_WS!==1) for(const st of raw) st.ws=(st.ws||1)*KAI_FB_WS;
+    return skelDeformApply(raw,f,id,variant);
+  }
   /* v229 剖面格式：每個 KAGE 段仍一一對齊，但 s 可切成數個不相連墨段。
      這是「心」等字避免中心候選線跨白區硬接的關鍵。剖面是量測資料，不適合
      與 KAGE 做半套幾何插值；混合量未到完整楷體時維持原骨架。 */
@@ -9759,6 +9783,8 @@ $("presets").addEventListener("click",e=>{
   if(!one){
     presetKey=b.dataset.p;
     document.querySelectorAll("#presets button").forEach(x=>x.classList.toggle("on",x===b));
+    /* v264：頂列換預設時，展示頁底下那排縮圖也跟著亮（原本只有反方向會同步） */
+    document.querySelectorAll("#scPreset button").forEach(x=>x.classList.toggle("on",x.dataset.p===presetKey));
   }
   if(typeof scAxLabel==="function") try{ scAxLabel(); }catch(e){}
   syncShowAxes();
@@ -13458,7 +13484,8 @@ async function boot(){
        這是整個工具最有代表性的一幕 —— 一眼看得出「每一筆都是分開的資料」，
        那正是別的字型做不到、也是這套骨架的核心。
        （只有在完全沒有存檔時才會走這裡；用過一次之後就照使用者自己的設定。） */
-    document.querySelector('#presets button[data-p="kai"]').classList.add("on");
+    /* v264：開場改黑體。楷書骨架還在整理（β），第一眼不要讓人看到它。 */
+    document.querySelector('#presets button[data-p="hei"]').classList.add("on");
     scApplyPoster("minimal");
     $("scTxt").value="就愛";
     scCanvas="square"; scLay="huge"; scDir="h"; scAlignMode="center";
@@ -13466,8 +13493,8 @@ async function boot(){
     scCol="mono";                         /* 剖面預覽先看黑色聯集 */
     scSetPaletteKey("yan");               /* 岩彩：五個顏色最繽紛 */
     scBgColor="#f1ece1"; scTransparentBg=false;
-    applyPreset("kai"); presetKey="kai";
-    document.querySelectorAll("#presets button,#scPreset button").forEach(x=>x.classList.toggle("on",x.dataset.p==="kai"));
+    applyPreset("hei"); presetKey="hei";
+    document.querySelectorAll("#presets button,#scPreset button").forEach(x=>x.classList.toggle("on",x.dataset.p==="hei"));
     scOff={}; scTr={}; scOvr={}; scCustom={}; scAxOvr={}; scSelKey=null;
     document.querySelectorAll("#scCanvas button").forEach(x=>x.classList.toggle("on",x.dataset.k===scCanvas));
     document.querySelectorAll("#scLayout button").forEach(x=>x.classList.toggle("on",x.dataset.k===scLay));
@@ -13727,9 +13754,10 @@ async function loadBuiltin(){
   const buf=await new Response(stream).arrayBuffer();
   RT.font=opentype.parse(buf.slice(0));RT.bytes=buf;RT.hash="twkai98-builtin";RT.name="TW-Kai-98_1（內建）";
   q("rtKaiFontName").textContent="TW-Kai-98_1 已內建 · "+(buf.byteLength/1048576).toFixed(1)+" MB";
-  status("內建 TW-Kai 已自動載入；開始由 HTML 重算 3000 字。",0);
-  await queueCurrentMissing();
-  warm3000();
+  /* v264：自動重算關掉。整批重算出來的楷書骨架大多斷筆、缺鉤（實測抽 400 字，
+     連 IoU 0.8 以上的也常壞在鉤和捺），不再自動套到畫面上；沒有精修骨架的字
+     退回 KAGE 骨架畫楷書。面板裡的手動重建保留，給要自己試的人用。 */
+  status("內建 TW-Kai 已載入。可在這裡手動重建指定的字（實驗功能，品質不保證）。",0);
 }
 
 /* 3000 字以外不用開面板：使用者一打字，若 KAGE 與內建楷體都有該字，
@@ -13809,11 +13837,13 @@ function init(){
   const adv=q("mAdv")&&q("mAdv").parentElement;if(adv&&adv.parentNode)adv.parentNode.insertBefore(btn,adv);else document.body.appendChild(btn);
   btn.onclick=()=>{modal.classList.add("on");if(!q("rtKaiChars").value)setCurrent();if(!RT.warmBusy&&RT.stop)warm3000();};q("rtKaiModal").querySelector(".rtKaiClose").onclick=()=>modal.classList.remove("on");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("on");};
   q("rtKaiFile").onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)loadFont(f).catch(err=>status("字體讀取失敗："+err.message,0));};q("rtKaiNow").onclick=setCurrent;q("rtKai3000").onclick=set3000;q("rtKaiStart").onclick=runBatch;q("rtKaiStop").onclick=()=>{RT.stop=true;};q("rtKaiExport").onclick=exportData;
-  if(q("scTxt"))q("scTxt").addEventListener("input",()=>setTimeout(queueCurrentMissing,0));
+  /* v264：打字不再自動重算楷書骨架（見 loadBuiltin 的說明） */
   /* 等 34,021 筆 KAGE 開機資料完成後才解壓字體，避免兩個大型工作同時搶手機記憶體。 */
   (async()=>{while(q("busy")&&q("busy").classList.contains("on"))await new Promise(r=>setTimeout(r,80));try{await loadBuiltin();}catch(e){status("內建字體載入失敗："+e.message,0);}})();
 }
 setTimeout(init,0);
+/* QA 用：實驗室從外面量楷書重算的品質（不影響畫面）。 */
+globalThis.FC_KAI_RT={RT,generate,fontMask,rawStrokes,drawCoverage,fitStroke,distanceField,addRepairs};
 })();
 
 
