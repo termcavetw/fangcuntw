@@ -2650,6 +2650,8 @@ const G = {
                         {t:"dot",p:[[500,380]],rk:1.06},
                         {t:"dot",p:[[815,380]],rk:1.06}]},
   "‧":{u:0x2027,sp:1,s:[{t:"dot",p:[[500,500]],rk:1.10}]},
+  /* v265：U+00B7 間隔號（人名「‧」常被打成這個），原本缺字 */
+  "·":{u:0x00B7,sp:1,s:[{t:"dot",p:[[500,500]],rk:1.10}]},
   "・":{u:0x30FB,sp:1,s:[{t:"dot",p:[[500,500]],rk:1.10}]},
   "～":{u:0xFF5E,sp:1,s:[{t:"heng",p:[[130,500],[500,500]],bend:-0.34,w:0.86},
                         {t:"heng",p:[[500,500],[870,500]],bend:0.34,w:0.86}]},
@@ -2878,7 +2880,7 @@ const CXED=["白","石","貝","古","胡","自","頁","舌",
             "故","員","蟲",
             "天","主","話","活","吾","語","這","進","連","軍","集","問","間","酒","媽","嗎",
             "是","政","看","的","市","引","星"];
-const PUNCT=["　","。","、","，","：","；","！","？","「","」","『","』","（","）","〔","〕","【","】","—","…","‧","・","～",
+const PUNCT=["　","。","、","，","：","；","！","？","「","」","『","』","（","）","〔","〕","【","】","—","…","‧","·","・","～",
              "?","!",",",":",";","(",")","[","]","~",".","-",
              /* 拉丁字母與數字 —— PUNCT 是寫死的匯出清單，
                 只在 G 加字形定義的話，畫面看得到但匯出的字型不會有。 */
@@ -11710,8 +11712,9 @@ $("subGo").addEventListener("click",()=>{
     const glyphs=[new opentype.Glyph({name:".notdef",unicode:0,advanceWidth:EM,path:new opentype.Path()}),
                   new opentype.Glyph({name:"space",unicode:0x20,advanceWidth:EM/2,path:new opentype.Path()})];
     for(const ch of subList)
-      glyphs.push(new opentype.Glyph({name:"uni"+G[ch].u.toString(16).toUpperCase(),
-        unicode:G[ch].u, advanceWidth:EM, path:toOtPath(glyphContours(ch,FA(),null,30))}));
+      /* v265：比例寬要跟完整匯出一樣（拉丁 G[ch].aw），原本寫死全形，挑字做中英招牌時英文字距爆開 */
+      glyphs.push(new opentype.Glyph({name:"uni"+G[ch].u.toString(16).toUpperCase().padStart(4,"0"),
+        unicode:G[ch].u, advanceWidth:(G[ch].aw>0?G[ch].aw:EM), path:toOtPath(glyphContours(ch,FA(),null,30))}));
     const font=new opentype.Font({familyName:lat,styleName:styleEN,
       unitsPerEm:EM,ascender:ASC,descender:DESC,glyphs});
     font.names.fontFamily     ={en:lat,"zh-TW":fam};
@@ -11720,7 +11723,10 @@ $("subGo").addEventListener("click",()=>{
     font.names.postScriptName ={en:lat+"-"+styleEN};
     font.names.manufacturer   ={en:"Fangcun"};
     font.names.designer       ={en:lat};
-    font.names.version        ={en:"Version 1.0"};
+    /* v265：版本號要遞增，寫死 1.0 的話 Windows 不讓重新安裝、Word 一直顯示舊字（完整匯出早就修過） */
+    const REV=nextFontRev();
+    font.names.version        ={en:REV.str};
+    font.tables.head=Object.assign({},font.tables.head,{fontRevision:REV.num});
     const smp=subList.slice(0,12).join("");
     font.names.sampleText     ={en:smp,"zh-TW":smp};
     font.tables.os2=Object.assign({},font.tables.os2,{

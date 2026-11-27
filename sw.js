@@ -14,7 +14,7 @@ if (self.location.hostname === "fangcuntw.vercel.app") {
     await self.registration.unregister();
   })()));
 } else {
-const CACHE = "fangcun-v265-slim";
+const CACHE = "fangcun-v266-subset";
 /* 正楷體字型檔獨立一個快取，換版不清掉（檔案內容永遠不變，免得每次更新都重下 19 MB） */
 const KAI_CACHE = "fangcun-twkai-98_1";   /* 換版本號 → 舊快取會被清掉，使用者不用重整兩次 */
 /* v265：只快取 "./" 一份。原本 "./" 和 "./index.html" 各存一份完整的 app，等於下載兩次。 */
