@@ -2189,8 +2189,9 @@ const KAI_SKEL=(typeof globalThis!=="undefined"&&globalThis.FC_KAI_SKEL)||{};
    在黑度都對齊 Noto 0.298 的條件下掃過視覺補償，拐點在 0.4–0.55：
    補償 0 → 27 個密字會糊；0.45 → 約 19 個；補償 1.0 反而回升到 22（過度矯正）。
    對 KAGE 的吻合度代價只有 0.756 → 0.74。字重 76 是該補償量下對齊 Noto 的值。 */
-const F={weight:80,optic:0.70,contrast:1.02,round:0.18,counter:1.00,gravity:1.00,face:1.05,hand:0.00,finish:0.00,
-         width:1.00,slant:0.00,taper:1.00,hook:1.00,dun:0.00,press:0.00,rise:0.00,
+/* v267：出廠值＝新的黑體（字重 75、收尖 0.30、鉤 0.80），「重設」回來跟黑體預設一致 */
+const F={weight:75,optic:0.70,contrast:1.02,round:0.18,counter:1.00,gravity:1.00,face:1.05,hand:0.00,finish:0.00,
+         width:1.00,slant:0.00,taper:0.30,hook:0.80,dun:0.00,press:0.00,rise:0.00,
          seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,
          arch:0.00,inflate:0.00,wave:0.00,chop:0.00,
          /* 斜筆粗細與中宮橫縱：出廠值＝舊行為，不動就零變化 */
@@ -4089,8 +4090,11 @@ function strokeOutline(st,f,wScale,NS){
     /* 延伸量按該筆、該端和部件縮放計算；舊版固定用全域半筆寬，小偏旁會突出。 */
     /* 原樣：KAGE 黑體只有直線端會延伸，曲線端的接續不延伸（延伸了，端帽的角會從接點戳出去，
        「愛」橫撇的轉角多一個鳥嘴）。kcx 由匯入時標記。 */
-    const noExtH=f.miter===0&&!st.hj&&(st.kcx==="b");
-    const noExtE=f.miter===0&&!st.ej&&(st.kcx==="b"||st.kcx==="e");
+    /* v267 圓體的圓角接：端點對端點的折角（hj/ej）不做斜接延伸，兩端改用圓帽、停在交點，
+       兩筆聯集起來外側自然是半筆寬的圓弧 —— 圓體「外圓」的轉角。只在圓角 ≥0.95（圓體）。 */
+    var roundJoinH=(f.round||0)>=0.95&&st.hj>0&&!st.kai2, roundJoinE=(f.round||0)>=0.95&&st.ej>0&&!st.kai2;
+    const noExtH=roundJoinH||(f.miter===0&&!st.hj&&(st.kcx==="b"));
+    const noExtE=roundJoinE||(f.miter===0&&!st.ej&&(st.kcx==="b"||st.kcx==="e"));
     if((st.h==="conn"||st.h==="kakato"||st.hj)&&!noExtH){
       const tan=[SP[1][0]-SP[0][0],SP[1][1]-SP[0][1]];
       let ext = st.hj ? st.hj
@@ -4362,6 +4366,8 @@ function strokeOutline(st,f,wScale,NS){
   /* v179：只有跨筆 T-junction 被裁過的開放端切平；hook/bend 不會進到這裡的 trim。 */
   if(st._trimH) C.a="flat";
   if(st._trimE) C.b="flat";
+  if(typeof roundJoinH!=="undefined"&&roundJoinH) C.a=1;
+  if(typeof roundJoinE!=="undefined"&&roundJoinE) C.b=1;
   /* ★ KAGE 的鉤是「骨架延伸出去的曲線」，不是端點造型 ——
      尾端原本一律寫死成 flat（切平），所以鉤造型軸對這一萬三千字完全沒作用。
      現在讓軸接管：0 維持原本的切平，其餘套用選定的收法。 */
@@ -4805,10 +4811,12 @@ function kaiSectionSweepContours(st,f,wScale){
        改成一條固定點數的帶子（A 去、B 回），急轉處可能自交，但 nonzero 照樣是墨；
        可變字型本來就保留重疊、不做聯集。 */
     if(VF_STABLE){
-      const rib=[["M",A[0][0],A[0][1]]];
-      for(let i=1;i<P.length;i++) rib.push(["L",A[i][0],A[i][1]]);
-      for(let i=P.length-1;i>=0;i--) rib.push(["L",B[i][0],B[i][1]]);
-      pieces.push(orient(rib,-1));
+      /* v268：帶子在急轉處自交，反向那一瓣會跟別筆抵銷成白洞（審查抓到）。
+         改成每段兩個三角形、各自定向：數量固定（不做面積過濾），三角形不會自交。 */
+      for(let i=0;i+1<P.length;i++){
+        for(const z of [[A[i],A[i+1],B[i]],[B[i],A[i+1],B[i+1]]])
+          pieces.push(orient([["M",z[0][0],z[0][1]],["L",z[1][0],z[1][1]],["L",z[2][0],z[2][1]]],-1));
+      }
     }
     else for(let i=0;i+1<P.length;i++){
       const tris=[[A[i],A[i+1],B[i]],[B[i],A[i+1],B[i+1]]];
@@ -4821,7 +4829,8 @@ function kaiSectionSweepContours(st,f,wScale){
     /* 圓角不是端帽。只在中心線真的轉彎的位置補局部圓盤，形成連續外緣；
        round=0.30 時完全不進來，保留 v244 楷體原始剖面。 */
     const rr=clamp(((Number(f.round)||0)-.30)/.70,0,1);
-    if(rr>.001){
+    /* VF：圓角軸的主體之間「要不要加圓盤」不能翻面，一律加（rr=0 時半徑極小、看不到） */
+    if(rr>.001||VF_STABLE){
       for(let i=1;i+1<P.length;i++){
         const u0=unit([P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]]);
         const u1=unit([P[i+1][0]-P[i][0],P[i+1][1]-P[i][1]]);
@@ -4829,7 +4838,8 @@ function kaiSectionSweepContours(st,f,wScale){
         if(bend<.0018) continue;
         /* v257：max 不再只增加 18%；轉角圓化必須在小字預覽也可辨識。 */
         const rad=(S[i].l+S[i].r)*.5*(.95+.55*rr)*clamp(bend*24,0,1);
-        if(rad>1.2 || VF_STABLE) pieces.push(orient(circleContour(P[i][0],P[i][1],Math.max(rad,.3)),-1));
+        if(VF_STABLE) pieces.push(orient(circleContour(P[i][0],P[i][1],rr>.001?Math.max(rad,.3):.3),-1));
+        else if(rad>1.2) pieces.push(orient(circleContour(P[i][0],P[i][1],rad),-1));
       }
     }
     const last=P.length-1,
@@ -6900,6 +6910,7 @@ function partRatioBoxes(cs,depth,pratio){
     return {...c, box:nb};
   });
 }
+function kqSame(a,b){ return Math.abs(a[0][0]-b[0][0])<1e-6&&Math.abs(a[0][1]-b[0][1])<1e-6&&Math.abs(a[1][0]-b[1][0])<1e-6&&Math.abs(a[1][1]-b[1][1])<1e-6; }
 function kqRel(P,C){
   const d=[P[1][0]-P[0][0],P[1][1]-P[0][1]],L2=d[0]*d[0]+d[1]*d[1];
   if(!(L2>1e-9)) return {};
@@ -6919,7 +6930,8 @@ function collect(id,box,wScale,out,seed,variant,depth,optic,pratio,done){
   if(S) S.forEach((st,i)=>out.push({t:st.t,bend:st.bend,w:st.w,end:st.end,fr:st.fr,cv:st.cv,
     h:st.h,e:st.e,kh:st.kh,ke:st.ke,kage:st.kage,kj:st.kj,kcx:st.kcx,kb:st.kb,
     /* KAGE 真控制點：跟 p 一樣放進框（框可以不等比），再換成弦座標 ku/kv 往下傳 */
-    ...(st.kq&&st.p.length===2?kqRel(st.p.map(([x,y])=>[x1+x*sx,y1+y*sy]),[x1+st.kq[0]*sx,y1+st.kq[1]*sy]):{}),
+    /* 端點被拖過（p 跟匯入時不同）就不用真控制點，退回 bend —— 否則控制點留在原地、曲線被扯成 V（審查抓到） */
+    ...(st.kq&&st.kp&&st.p.length===2&&kqSame(st.p,st.kp)?kqRel(st.p.map(([x,y])=>[x1+x*sx,y1+y*sy]),[x1+st.kq[0]*sx,y1+st.kq[1]*sy]):{}),
     r:st.r,rk:st.rk,lat:st.lat,ws,
     /* 記下這一筆從哪個字形的第幾筆來、以及它被塞進哪個框 —— 
        有這些就能從組合字裡直接拖動部件的筆畫，改一次所有用到的字一起變 */
@@ -7671,6 +7683,7 @@ function junctionPatches(strokes,f){
 }
 function cornerFills(strokes,f){
   if(f.miter===0) return [];
+  if((f.round||0)>=0.95) return [];   /* v267 圓體走圓角接（strokeOutline），不補方角 */
   const out=[], seen=new Set(), E=[];
   for(let i=0;i<strokes.length;i++){
     const st=strokes[i]; if(st.kai2||!st.p||st.p.length<2) continue;
@@ -7950,7 +7963,7 @@ function csBudgetReset(){ CS_T0=-1; PH_T0=-1; }
    ★ VF_STABLE 不做：補丁數會隨字重變，可變字型節點必須一致。
    ★ 有時間預算：每輪重畫超過 PH_BUDGET_MS 就對剩下的字跳過（畫面降級，不卡死）。
    ========================================================================== */
-let PH_T0=-1;
+let PH_T0=-1, PH_SKIP=false;
 const PH_D=1.5;                        /* 裂縫閉合用的外撐量（EM 單位）：畫面 1 像素約 2–3 單位 */
 function inflateRing(p,d){
   const n=p.length-1; if(n<3) return p;           /* pcFlatten 收尾會重複第一點 */
@@ -7969,7 +7982,8 @@ function inflateRing(p,d){
 const PH_BUDGET_MS=300;
 function fillPinholes(cs){
   if(VF_STABLE||!cs||cs.length<2) return [];
-  if(typeof globalThis!=="undefined"&&globalThis.FC_NO_PINFILL) return [];   /* QA A/B 開關 */
+  if(typeof globalThis!=="undefined"&&globalThis.FC_NO_PINFILL) return [];
+  if(PH_SKIP) return [];   /* QA A/B 開關 */
   if(PH_T0<0) PH_T0=Date.now();
   if(Date.now()-PH_T0>PH_BUDGET_MS) return [];
   const pc=pcLib(); if(!pc) return [];
@@ -8007,7 +8021,9 @@ function fillPinholes(cs){
         for(let m=0;m<q.length;m+=2){ const d=(q[m][0]-cx)**2+(q[m][1]-cy)**2; if(d<bd){bd=d;best=k;} } }
       const cmds=[["M",R[0][0],R[0][1]]];
       for(let k=1;k<R.length-1;k++) cmds.push(["L",R[k][0],R[k][1]]);
-      const c=orient(cmds,-1);
+      /* 繞向跟最近那條輪廓同號：楷書的輪廓經過聯集後是正面積，固定用 -1 會跟它抵銷變白（審查抓到） */
+      const ownSign=best>=0?(contourArea(owner[best])<0?-1:1):-1;
+      const c=orient(cmds,ownSign);
       if(best>=0 && owner[best].si!==undefined) c.si=owner[best].si;
       add.push(c);
     }
@@ -8458,7 +8474,8 @@ function collectRenderStrokes(id,f,variant){
     /* v264：楷書預設遇到沒有楷書骨架的字，退回 KAGE 骨架照楷書軸畫。
        KAGE 骨架的筆比實測楷書粗很多（同字重墨量約 1.86 倍），整行字會一深一淺；
        這裡把退回字的筆寬壓到跟真楷同黑度。 */
-    if(amount>=0.999 && KAI_FB_WS!==1) for(const st of raw) st.ws=(st.ws||1)*KAI_FB_WS;
+    /* 拉丁字母、標點不是楷書退回字，不壓細（審查抓到 A、！ 被壓到 0.5–0.6） */
+    if(amount>=0.999 && KAI_FB_WS!==1 && !(G[id]&&(G[id].aw>0||G[id].sp))) for(const st of raw) st.ws=(st.ws||1)*KAI_FB_WS;
     return skelDeformApply(raw,f,id,variant);
   }
   /* v229 剖面格式：每個 KAGE 段仍一一對齊，但 s 可切成數個不相連墨段。
@@ -8614,7 +8631,9 @@ function glyphContours(id,f,variant,NS){
   /* v227 接點覆蓋補丁：Coverage first —— 補的是畫面與匯出共同的接點白洞，
      跟補墨四邊形一樣標 si，跟著自己的筆一起上色。 */
   for(const c of junctionPatches(marked,f)){ if(c.si!==undefined) c.mi=mi[c.si]; out.push(c); }
-  /* v261 畫面針孔補墨：匯出本來就會丟掉的小洞，畫面也一起補（VF 不做）。 */
+  /* v261 畫面針孔補墨：匯出本來就會丟掉的小洞，畫面也一起補（VF 不做）。
+     中空軸開著時不補：補丁讓中空的布林運算失敗，整個字退回實心（審查抓到）。 */
+  PH_SKIP=(f.hollow||0)>0.01;
   for(const c of fillPinholes(out)){ if(c.si!==undefined) c.mi=mi[c.si]; out.push(c); }
   /* 內白保護接在唯一的出口，畫面與匯出一次涵蓋。
      出廠 cmin=0 直接跳過，所以不開就完全不影響（也不會呼叫布林運算）。 */
@@ -8877,8 +8896,12 @@ const PRESETS={
   xing:{weight:90,contrast:1.35,round:0.72,counter:0.90,gravity:0.96,face:1.02,
     hand:0.62,finish:0.40,width:1.00,slant:0.05,taper:0.85,hook:1.20,dun:0.60,press:1.05,rise:0.09,
     cap:0.72,term:0,head:1,optic:0.35,cnaniso:0,diag:1.00,cround:0,pers:0,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cmin:0},
-  hei:{weight:80,optic:0.70,contrast:1.02,round:0.18,counter:1.00,gravity:1.00,face:1.05,hand:0,finish:0,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.18,cmin:0},
-  yuan:{weight:84,optic:0.45,contrast:1.00,round:1.00,counter:0.90,gravity:0.97,face:1.03,hand:0.06,finish:0,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:1.00,cmin:0},
+  /* v267 黑體去明體化：撇捺收尖 1.00→0.30、鉤 1.00→0.80（尾端鈍、不帶喇叭尾，像現代黑體）；
+     鈍尾比較黑，字重 80→75 讓整體黑度維持原樣（常用 100 字墨量 ±3%）。 */
+  hei:{weight:75,optic:0.70,contrast:1.02,round:0.18,counter:1.00,gravity:1.00,face:1.05,hand:0,finish:0,width:1.00,slant:0,taper:0.30,hook:0.80,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.18,cmin:0},
+  /* v267 圓體：撇捺幾乎不收尖（1.00→0.25）、鉤 0.75、中宮放寬 0.90→1.00；折角改成圓角接（見 strokeOutline）。
+     收尖 0 的話密字的小白洞多 78%（1,874 字抽樣 405→720），0.25＋字重 77 折衷在 549，黑度維持原樣。 */
+  yuan:{weight:77,optic:0.45,contrast:1.00,round:1.00,counter:1.00,gravity:0.97,face:1.03,hand:0.06,finish:0,width:1.00,slant:0,taper:0.25,hook:0.75,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:1.00,cmin:0},
   ming:{weight:60,optic:0.35,contrast:2.10,round:0.04,counter:1.08,gravity:1.03,face:1.05,hand:0,finish:0.95,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.85,press:0.25,rise:0.045,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.04,cmin:0},
   hand:{weight:88,optic:0.30,contrast:1.30,round:0.78,counter:0.88,gravity:0.94,face:1.01,hand:0.85,finish:0.34,width:1.00,slant:0,taper:0.85,hook:1.00,dun:0.55,press:0.95,rise:0.100,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.78,cmin:0},
   title:{weight:128,optic:0.62,contrast:1.00,round:0.10,counter:0.82,gravity:1.00,face:1.11,hand:0,finish:0,width:1.00,slant:0,taper:1.00,hook:1.00,dun:0.00,press:0.00,rise:0.00,seed:7,scatter:0.00,wobble:0.00,spike:0.00,hollow:0.00,arch:0.00,inflate:0.00,wave:0.00,chop:0.00,cap:0.10,cmin:0},
@@ -9942,7 +9965,7 @@ function kageToGlyph(data){
       /* ku/kv：控制點在弦座標裡的真位置（沿弦比例／法向比例）。bend 只記法向、而且夾在 ±0.46，
          控制點偏向一端的曲線（冖、夂的撇頭）起筆切線會跑掉 —— 原樣用 ku/kv 還原。 */
       const _b=kageBend(P[0],P[1],P[2]);
-      strokes.push({...st,p:[P[0],P[2]],bend:_b,kcx:"b",kq:P[1].slice(),kb:_b});
+      strokes.push({...st,p:[P[0],P[2]],bend:_b,kcx:"b",kq:P[1].slice(),kb:_b,kp:[P[0].slice(),P[2].slice()]});
     } else if(a1t===1){
       strokes.push({...kageClassify(P,a3,2,a2,a1t),p:P});
     } else {
