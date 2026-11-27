@@ -75,7 +75,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#16130d">
+<meta name="theme-color" content="#ffffff">
 <meta name="description" content="方寸 — 用骨架與參數設計整套繁體中文字型">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -1344,6 +1344,189 @@
 </style>
 <script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>
 <script defer src="/_vercel/insights/script.js"></script>
+<style id="ui-foundry">
+/* ==========================================================================
+   v259 介面改版「字體工坊」
+   參考字型公司試字頁：白底、大留白、膠囊分段按鈕、單一強調色（亮藍）。
+   ★ 只是外觀層：放在原本樣式之後，不改任何 DOM、id、事件。
+     規則一律加 `body` 前綴提高權重，原本的版面規則（grid、手機排版）全部沿用。
+   ========================================================================== */
+:root{
+  --paper:#ffffff; --paper-2:#f3f3f1; --paper-3:#f8f8f6; --ink:#0f0f0f;
+  --line:#e9e9e6; --line-2:#d3d3ce; --muted:#8a8a85; --skel:#2f4bff;
+  --acc:#2f4bff; --acc-soft:#eef1ff; --ok:#14a36b; --w1:#e09a1a; --w2:#e5483b;
+  --pill:999px; --r-card:12px; --r-sheet:18px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.06),0 1px 1px rgba(0,0,0,.04);
+  --shadow-2:0 12px 32px -12px rgba(0,0,0,.22),0 2px 6px rgba(0,0,0,.05);
+}
+body{background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+
+/* ---------- 頭列 ---------- */
+body .bar{height:60px;gap:10px;padding:0 18px;border-bottom:1px solid var(--line);background:var(--paper)}
+body .brand{gap:8px;align-items:center}
+body .brand b{font-size:22px;font-weight:900;letter-spacing:.02em}
+body .brand span{font-family:inherit;font-size:10px;font-weight:800;letter-spacing:.14em;color:var(--ink)}
+body #langBtn{font:700 10px/1 inherit;padding:5px 8px;border:1px solid var(--line-2);border-radius:var(--pill);background:transparent;color:var(--muted);cursor:pointer}
+body #langBtn:hover{color:var(--ink);border-color:var(--ink)}
+/* 分段按鈕：膠囊容器 */
+body .tabs,body .presets{border:0;background:var(--paper-2);padding:3px;gap:2px;border-radius:var(--pill)}
+body .tabs button,body .presets button{border:0!important;border-radius:var(--pill);background:transparent;color:var(--muted);
+  font-size:12px;font-weight:600;padding:6px 13px;letter-spacing:.02em;transition:background .15s,color .15s}
+body .tabs button:hover,body .presets button:hover{color:var(--ink);background:transparent}
+/* 主分頁（工作台／展示）黑底；其餘分段是白色浮起 —— 一眼分得出主次 */
+body #tabs button.on{background:var(--ink);color:#fff}
+body #engines button.on,body #presets button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-1)}
+body #rtKaiOpen{border-radius:var(--pill)}
+
+/* ---------- 按鈕 ---------- */
+body .btn{border-radius:var(--pill);font-weight:600;letter-spacing:.02em;border:1px solid var(--ink);background:var(--ink);color:#fff}
+body .btn:hover{background:#2a2a2a}
+body .btn.ghost{background:var(--paper-2);border-color:transparent;color:var(--ink)}
+body .btn.ghost:hover{background:var(--line)}
+body .btn[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+body #mExp{background:var(--acc);border-color:var(--acc);color:#fff}
+body #mExp:hover{background:#2238d9}
+body .menubtn i{border-top-color:currentColor}
+
+/* ---------- 下拉選單 ---------- */
+body .menupanel{border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-2);padding:6px;background:#fff}
+body .menupanel .btn{background:transparent;border-color:transparent;border-radius:9px;font-weight:500}
+body .menupanel .btn:hover{background:var(--paper-2)}
+body .menunote{color:var(--muted)}
+
+/* ---------- 展示頁工具列 ---------- */
+body .scbar{background:#fff;border-bottom:1px solid var(--line);gap:22px;padding-left:18px;padding-right:18px}
+body .scbar label,body .scbar>.g>label{font-family:inherit;font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--ink)}
+/* 分段：同樣是膠囊容器 */
+body .seg{display:inline-flex;align-items:center;background:var(--paper-2);border-radius:var(--pill);padding:3px;gap:2px}
+body .seg button{font-family:inherit;font-size:11.5px;font-weight:600;background:transparent;border:0;border-radius:var(--pill);
+  color:var(--muted);padding:5px 11px;cursor:pointer;margin:0;transition:background .15s,color .15s}
+body .seg button:hover{color:var(--ink)}
+body .seg button.on,body .seg button[aria-pressed="true"]{background:#fff;color:var(--ink);box-shadow:var(--shadow-1)}
+/* 調色盤 */
+body .pals{gap:6px}
+body .pal{display:inline-flex;align-items:center;gap:3px;border:1px solid transparent;background:var(--paper-2);
+  border-radius:var(--pill);padding:5px 10px 5px 6px;cursor:pointer}
+body .pal i{width:10px;height:10px;border-radius:50%;display:inline-block}
+body .pal em{font-style:normal;font-size:11px;font-weight:600;color:var(--muted);margin-left:4px}
+body .pal.on{background:#fff;border-color:var(--ink)}
+body .pal.on em{color:var(--ink)}
+body input[type=color]{border-radius:8px!important;border:1px solid var(--line-2)!important;overflow:hidden;cursor:pointer}
+body input[type=checkbox]{accent-color:var(--ink)}
+
+/* ---------- 畫布 ---------- */
+body .scstage{background:#efefec!important}
+body #scArt{border-radius:6px;box-shadow:0 28px 60px -24px rgba(0,0,0,.28),0 0 0 1px rgba(0,0,0,.05)}
+body .sczoom,body #smapBtn{border:0;border-radius:var(--pill);background:#fff;box-shadow:var(--shadow-2);overflow:hidden}
+body .sczoom button{border-right:1px solid var(--line)}
+body .schint{color:var(--muted);opacity:1}
+
+/* ---------- 滑桿 ---------- */
+body input[type=range]::-webkit-slider-runnable-track{height:3px;background:var(--line-2);border-radius:3px}
+body input[type=range]::-webkit-slider-thumb{width:14px;height:14px;border-radius:50%;background:var(--ink);border:0;
+  margin-top:-5.5px;box-shadow:0 0 0 3px #fff,0 1px 3px rgba(0,0,0,.25)}
+body input[type=range]:hover::-webkit-slider-thumb{background:var(--acc)}
+body input[type=range]::-moz-range-track{height:3px;background:var(--line-2);border-radius:3px}
+body input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--ink);border:0;box-shadow:0 0 0 3px #fff}
+
+/* ---------- 展示頁底部：打字與軸 ---------- */
+body .scfoot{background:#fff;border-top:1px solid var(--line)}
+body .scfoot textarea{border:0!important;border-bottom:2px solid var(--ink)!important;border-radius:0;background:transparent!important;
+  box-shadow:none!important;font-size:18px;font-weight:600;color:var(--ink)}
+body .scfoot textarea:focus{border-bottom-color:var(--acc)!important}
+body .scfoot::before{color:var(--muted)}
+body .scaxes>.g>label,body .sclay-g>label{font-size:11px;font-weight:700;color:var(--ink)}
+body .scaxes>.g>b,body .sclay-g>b{color:var(--acc);font-weight:600}
+body .scaxes>.scaxes-sep{background:var(--line)}
+/* 預設縮圖：圓角卡片 */
+body #scPreset{background:transparent;padding:0;gap:6px;flex-wrap:wrap}
+body #scPreset button.pth{background:var(--paper-2);border-radius:10px;padding:5px 7px 4px;min-width:44px;box-shadow:none;color:var(--ink)}
+body #scPreset button.pth:hover{background:var(--line)}
+body #scPreset button.pth.on{background:var(--ink);color:#fff}
+body #scPreset .pth-n{font-size:10.5px;font-weight:600}
+body .scfoot .tag,body #scStat{color:var(--muted)}
+
+/* ---------- 工作台 ---------- */
+body .pane+.pane{border-left:1px solid var(--line)}
+body .pane h2{font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--ink);border-bottom:1px solid var(--line);background:#fff}
+body .pane h2 em{color:var(--muted)}
+body #ctrls .ctrl{border-bottom:1px solid var(--line)}
+body #ctrls .ctrl-head label{font-weight:700}
+body #ctrls .ro{color:var(--acc);font-weight:600}
+body #ctrls .ends{color:var(--muted)}
+body .qa{border-top:1px solid var(--line)}
+body .qa h3{font-family:inherit;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+body .qabar{border:0;border-radius:var(--pill);height:6px;background:var(--paper-2)}
+body .qanums span::before{border-radius:50%}
+body #q{border:0;background:var(--paper-2);border-radius:var(--pill);padding:7px 14px}
+body #q:focus{outline:2px solid var(--acc);outline-offset:0}
+body .tagrow{border-bottom:1px solid var(--line);font-family:inherit;color:var(--muted)}
+body .cells{gap:8px}
+body .cell{border:0;background:var(--paper-3);border-radius:10px;overflow:hidden;transition:background .12s}
+body .cell:hover{background:var(--paper-2);border-color:transparent}
+body .cell.comp{background:#f1f2f6}
+body .cell.punc{border:1px dashed var(--line-2)}
+body .cell.on{box-shadow:0 0 0 2px var(--acc);border-color:transparent}
+body .cell .cap{border-top:0;color:var(--muted)}
+body .cell .cap b{font-weight:700}
+body .bigbox{border-radius:12px}
+body .modes{border-bottom:1px solid var(--line)}
+body .modes input{accent-color:var(--ink)}
+body .sect{border-bottom:1px solid var(--line)}
+body .sect h4{font-family:inherit;font-weight:800;letter-spacing:.06em;color:var(--ink)}
+body .foot{border-top:1px solid var(--line);background:#fff}
+body .foot .lbl{border-right:1px solid var(--line)}
+body .foot .lbl b{font-weight:800}
+body .foot .stat{border-left:1px solid var(--line)}
+body .foot input[type=text]{border:0;background:var(--paper-2);border-radius:var(--pill);padding:7px 14px}
+body .foot input[type=text]:focus{outline:2px solid var(--acc)}
+
+/* ---------- 彈出視窗 ---------- */
+body .modal{background:rgba(15,15,15,.32);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+body .sheet{border:0;border-radius:var(--r-sheet);box-shadow:0 40px 90px -30px rgba(0,0,0,.45);overflow:hidden;background:#fff}
+body .sheet header,body .sheet footer{border-color:var(--line)}
+body .sheet header b{font-weight:800}
+body .sheet textarea,body .sheet input[type=text]{border:1px solid var(--line-2);border-radius:10px;background:var(--paper-3)}
+body .sheet textarea:focus{border-color:var(--acc)}
+body .sheet .tip code{border-radius:5px}
+body .qacard,body .qatriage,body .qatriage-card,body .qachip{border-radius:10px;border-color:var(--line)}
+body .about{border-radius:12px;border-color:var(--line);background:var(--paper-3)}
+
+/* ---------- 展開調整（進階軸面板） ---------- */
+body .sctypebox{border-top:1px solid var(--line);background:#fff}
+body .sctypegroup{font-weight:800;font-size:11px;letter-spacing:.04em;border-bottom:1px solid var(--line);padding:12px 0 5px}
+body #scTypeBox .sctypegroup{font-size:11px;padding:12px 0 5px}
+body .sctypegroup em{font-family:inherit;font-weight:700;letter-spacing:.12em;color:var(--muted)}
+/* 軸名太長（部件比例、鉤長…）原本固定 42px 不換行，會被滑桿壓到字 → 欄寬放大、名稱可換兩行 */
+body .scmore-in{grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:2px 20px}
+body .scmore-ax{gap:8px;padding:3px 0}
+body .scmore-ax label{width:58px;white-space:normal;line-height:1.2;font-size:10.5px;font-weight:600;color:var(--ink);overflow:hidden}
+body .scmore-ax b{color:var(--acc);font-weight:600;width:34px;text-align:right}
+@media (max-width:700px){ body .scmore-in{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))} }
+
+/* ---------- 手機 ---------- */
+@media (max-width:700px){
+  body .bar{height:auto;min-height:56px;padding:0 12px;gap:8px}
+  body .brand{background:var(--paper)}
+  body .brand b{font-size:19px}
+  body .tabs button,body .presets button,body .bar .btn{min-height:34px;padding:5px 11px}
+  body .mobile-panes{background:#fff;border-bottom:1px solid var(--line);padding:5px 10px;gap:4px;height:48px}
+  body .mobile-panes button{border:0!important;border-radius:var(--pill);background:var(--paper-2);color:var(--muted);font-weight:700}
+  body .mobile-panes button.on{background:var(--ink);color:#fff}
+  body .seg button{min-height:32px;padding:5px 11px}
+  body input[type=range]::-webkit-slider-runnable-track{height:4px}
+  body input[type=range]::-webkit-slider-thumb{width:24px;height:24px;margin-top:-10px;box-shadow:0 0 0 3px #fff,0 1px 4px rgba(0,0,0,.3)}
+  body input[type=range]::-moz-range-thumb{width:22px;height:22px}
+  body .cells{gap:8px}
+  body .menupanel{border-radius:18px 18px 0 0}
+  body .sheet{border-radius:18px 18px 0 0}
+  body #showcase>.scstagewrap{background:#efefec;border-bottom:1px solid var(--line)}
+}
+@media (max-width:700px){
+  body .bar #mExpWrap{padding-left:12px;background:#fff;box-shadow:-16px 0 12px #fff}
+}
+</style>
 </head>
 <body>
 <div class="app">
