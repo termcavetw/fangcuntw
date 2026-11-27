@@ -7867,7 +7867,82 @@ function markCorners(strokes,f){
 /* 內白處理的時間預算（毫秒）。每次重畫開頭呼叫 csBudgetReset() 歸零。 */
 let CS_T0=-1;
 const CS_BUDGET_MS=1200;
-function csBudgetReset(){ CS_T0=-1; }
+function csBudgetReset(){ CS_T0=-1; PH_T0=-1; }
+/* ==========================================================================
+   v261 畫面針孔補墨（fillPinholes）
+   匯出的靜態字型在 finalizeContours 會把 PINHOLE_MAX 以下的洞丟掉，
+   但畫面是逐筆各自填色，筆與筆交會圍出的小白洞（撇折折點、橫折內角、
+   豎提內角、米字交會）一直留在畫面上，原樣最明顯。
+   作法：整字 union 一次，找面積 < PINHOLE_MAX 的內環，
+   往外撐 1.5 單位（蓋過邊界、避免逐筆反鋸齒留細線）當一塊墨補回去，
+   si 給最近的筆，依筆上色時跟著那一筆。
+   ★ VF_STABLE 不做：補丁數會隨字重變，可變字型節點必須一致。
+   ★ 有時間預算：每輪重畫超過 PH_BUDGET_MS 就對剩下的字跳過（畫面降級，不卡死）。
+   ========================================================================== */
+let PH_T0=-1;
+const PH_D=1.5;                        /* 裂縫閉合用的外撐量（EM 單位）：畫面 1 像素約 2–3 單位 */
+function inflateRing(p,d){
+  const n=p.length-1; if(n<3) return p;           /* pcFlatten 收尾會重複第一點 */
+  const a=csSignedAreaSimple(p), sg=a>0?1:-1, out=[];
+  for(let i=0;i<n;i++){
+    const A=p[(i-1+n)%n], B=p[i], C=p[(i+1)%n];
+    let n1x=(B[1]-A[1]), n1y=-(B[0]-A[0]); const l1=Math.hypot(n1x,n1y)||1; n1x/=l1; n1y/=l1;
+    let n2x=(C[1]-B[1]), n2y=-(C[0]-B[0]); const l2=Math.hypot(n2x,n2y)||1; n2x/=l2; n2y/=l2;
+    let mx=n1x+n2x, my=n1y+n2y; const lm=Math.hypot(mx,my);
+    if(lm<1e-6){ mx=n1x; my=n1y; } else { mx/=lm; my/=lm; }
+    out.push([B[0]+mx*d*sg, B[1]+my*d*sg]);      /* 角平分線方向，不做斜接放大，尖角不會刺出去 */
+  }
+  out.push(out[0].slice());
+  return out;
+}
+const PH_BUDGET_MS=300;
+function fillPinholes(cs){
+  if(VF_STABLE||!cs||cs.length<2) return [];
+  if(typeof globalThis!=="undefined"&&globalThis.FC_NO_PINFILL) return [];   /* QA A/B 開關 */
+  if(PH_T0<0) PH_T0=Date.now();
+  if(Date.now()-PH_T0>PH_BUDGET_MS) return [];
+  const pc=pcLib(); if(!pc) return [];
+  const flat=[], owner=[];
+  try{
+    /* 每條輪廓先往外撐 PH_D：筆與筆之間只差零點幾單位的裂縫，
+       精確幾何上是「通到外面的缺口」，畫面上卻是一個洞（反鋸齒把裂縫糊掉）。
+       撐開後裂縫閉合，這種洞才找得到。 */
+    cs.forEach(c=>{ const p=pcFlatten(c,4); if(p.length>=4){ flat.push([inflateRing(p,PH_D)]); owner.push(c); } });
+  }catch(e){ return []; }
+  if(flat.length<2) return [];
+  let u; try{ u=pc.union(...flat); }catch(e){ return []; }
+  const add=[];
+  for(const poly of (u||[])) for(let r=1;r<poly.length;r++){
+    const ring=poly[r];
+    const a=Math.abs(csSignedAreaSimple(ring));
+    /* 撐過的聯集，洞會縮一圈：用「面積＋周長×撐量」還原成原本的大小再比，
+       否則本來就小的真字懷（鹵裡的四格）會被當成針孔填掉。 */
+    let per=0; for(let k=1;k<ring.length;k++) per+=Math.hypot(ring[k][0]-ring[k-1][0],ring[k][1]-ring[k-1][1]);
+    const aOrig=a+per*PH_D+Math.PI*PH_D*PH_D;
+    if(!(a>0.2 && aOrig<PINHOLE_MAX)) continue;
+    /* 補丁＝洞往外撐（沿角平分線，撐過邊界蓋進墨裡），再過一次 union 整理成乾淨的外環，
+       避免細長月牙形撐出自交、反向的那一瓣在畫面上變成白線。 */
+    let patch;
+    try{
+      const g=inflateRing(ring, PH_D+1.5);   /* 正值＝往這個環自己的外面撐，跟繞向無關 */
+      patch=pc.union([g]);
+    }catch(e){ continue; }
+    for(const pp of (patch||[])){
+      const R=pp[0]; if(!R||R.length<4) continue;
+      let cx=0,cy=0; for(const q of R){cx+=q[0];cy+=q[1];} cx/=R.length; cy/=R.length;
+      /* 最近的筆：比各輪廓取樣點到中心的距離 */
+      let best=-1,bd=1e18;
+      for(let k=0;k<flat.length;k++){ const q=flat[k][0];
+        for(let m=0;m<q.length;m+=2){ const d=(q[m][0]-cx)**2+(q[m][1]-cy)**2; if(d<bd){bd=d;best=k;} } }
+      const cmds=[["M",R[0][0],R[0][1]]];
+      for(let k=1;k<R.length-1;k++) cmds.push(["L",R[k][0],R[k][1]]);
+      const c=orient(cmds,-1);
+      if(best>=0 && owner[best].si!==undefined) c.si=owner[best].si;
+      add.push(c);
+    }
+  }
+  return add;
+}
 /* v228 ── 雙骨架來源 -----------------------------------------------------
    方寸原本所有 preset 共用 KAGE 骨架；楷書現在可在 glyph 層換成 TW-Kai 抽出的
    一一對應骨架。資料只覆蓋 113 字時，缺字或筆數不符必須完整回退 KAGE。
@@ -8461,6 +8536,8 @@ function glyphContours(id,f,variant,NS){
   /* v227 接點覆蓋補丁：Coverage first —— 補的是畫面與匯出共同的接點白洞，
      跟補墨四邊形一樣標 si，跟著自己的筆一起上色。 */
   for(const c of junctionPatches(marked,f)){ if(c.si!==undefined) c.mi=mi[c.si]; out.push(c); }
+  /* v261 畫面針孔補墨：匯出本來就會丟掉的小洞，畫面也一起補（VF 不做）。 */
+  for(const c of fillPinholes(out)){ if(c.si!==undefined) c.mi=mi[c.si]; out.push(c); }
   /* 內白保護接在唯一的出口，畫面與匯出一次涵蓋。
      出廠 cmin=0 直接跳過，所以不開就完全不影響（也不會呼叫布林運算）。 */
   const finalContours=counterOn ? protectCounters(id,f,f.cmin,out) : out;
